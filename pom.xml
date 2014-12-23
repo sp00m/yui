@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ ! Copyright (c) boogiedev.com, all rights reserved.
+ ! This code is licensed under the LGPL 3.0 license,
+ ! available at the root application directory.
+ ! -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	
+	<modelVersion>4.0.0</modelVersion>
+	
+	<groupId>com.boogiedev</groupId>
+	<artifactId>yui</artifactId>
+	<version>1.0</version>
+	<packaging>jar</packaging>
+	<name>yui</name>
+	<description>CSS and JS Compression via the YUI Compressor</description>
+	
+	<developers>
+		<developer>
+			<id>chma</id>
+			<name>Christophe Maillard</name>
+			<email>christophe.maillard@rocketmail.com</email>
+		</developer>
+	</developers>
+	
+	<properties>
+		<jdk.version>1.7</jdk.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+	</properties>
+	
+	<dependencies>
+		<dependency>
+			<groupId>com.yahoo.platform.yui</groupId>
+			<artifactId>yuicompressor</artifactId>
+			<version>2.4.7</version>
+			<!-- http://stackoverflow.com/a/13325264/1225328 -->
+			<exclusions>
+				<exclusion>
+					<groupId>rhino</groupId>
+					<artifactId>js</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>1.0.13</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>15.0</version>
+		</dependency>
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>servlet-api</artifactId>
+			<version>2.5</version>
+			<scope>provided</scope>
+		</dependency>
+	</dependencies>
+	
+</project>
