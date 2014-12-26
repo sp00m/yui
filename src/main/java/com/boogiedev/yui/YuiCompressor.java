@@ -28,6 +28,7 @@ import org.mozilla.javascript.EvaluatorException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Strings;
 import com.google.common.io.ByteStreams;
 import com.yahoo.platform.yui.compressor.CssCompressor;
 import com.yahoo.platform.yui.compressor.JavaScriptCompressor;
@@ -38,19 +39,19 @@ import com.yahoo.platform.yui.compressor.JavaScriptCompressor;
 public class YuiCompressor {
 
 	/** Logger. */
-	private static final Logger LOGGER = LoggerFactory.getLogger(YuiCompressor.class);
+	private static final Logger DEFAULT_LOGGER = LoggerFactory.getLogger(YuiCompressor.class);
 
 	/**
 	 * Custom error reporter.
 	 */
-	private static class YuiErrorReporter implements ErrorReporter {
+	private class YuiErrorReporter implements ErrorReporter {
 
 		/**
 		 * {@inheritDoc}
 		 */
 		@Override
 		public void error(String message, String sourceName, int line, String lineSource, int lineOffset) {
-			LOGGER.error(line < 0 ? message : line + ":" + lineOffset + ":" + message);
+			logger.error(line < 0 ? message : line + ":" + lineOffset + ":" + message);
 		}
 
 		/**
@@ -67,7 +68,7 @@ public class YuiCompressor {
 		 */
 		@Override
 		public void warning(String message, String sourceName, int line, String lineSource, int lineOffset) {
-			LOGGER.warn(line < 0 ? message : line + ":" + lineOffset + ":" + message);
+			logger.warn(line < 0 ? message : line + ":" + lineOffset + ":" + message);
 		}
 
 	}
@@ -77,6 +78,9 @@ public class YuiCompressor {
 
 	/** The CSS files names (or directories names) that must be excluded from the process. */
 	private final List<String> cssExcludes;
+
+	/** The CSS input directory, may be null. */
+	private final File cssInputDir;
 
 	/** The CSS input files directories. */
 	private final List<File> cssInputDirs;
@@ -90,6 +94,9 @@ public class YuiCompressor {
 	/** The JS files names (or directories names) that must be excluded from the process. */
 	private final List<String> jsExcludes;
 
+	/** The JS input directory, may be null. */
+	private final File jsInputDir;
+
 	/** The JS input files directories. */
 	private final List<File> jsInputDirs;
 
@@ -98,6 +105,9 @@ public class YuiCompressor {
 
 	/** The JS final file. */
 	private final File jsOutputFile;
+
+	/** Logger. */
+	private Logger logger;
 
 	/**
 	 * Constructor.
@@ -116,63 +126,46 @@ public class YuiCompressor {
 	 *          The CSS files names (or directories names) that must be excluded from the process, separated by ";".
 	 */
 	public YuiCompressor(File jsInputDir, File jsOutputFile, String jsExcludes, File cssInputDir, File cssOutputFile, String cssExcludes) {
+		this.jsInputDir = jsInputDir;
 		this.jsOutputFile = jsOutputFile;
 		jsInputFiles = new ArrayList<>();
 		jsInputDirs = new ArrayList<>();
 		this.jsExcludes = new ArrayList<>();
-		if (jsExcludes != null) {
+		if (!Strings.isNullOrEmpty(jsExcludes)) {
 			this.jsExcludes.addAll(Arrays.asList(jsExcludes.split(";", -1)));
 		}
-		if (jsInputDir != null) {
-			readDirectory(jsInputDir, jsInputFiles, jsInputDirs, this.jsExcludes, ".js");
-		}
+		this.cssInputDir = cssInputDir;
 		this.cssOutputFile = cssOutputFile;
 		cssInputFiles = new ArrayList<>();
 		cssInputDirs = new ArrayList<>();
 		this.cssExcludes = new ArrayList<>();
-		if (cssExcludes != null) {
+		if (!Strings.isNullOrEmpty(cssExcludes)) {
 			this.cssExcludes.addAll(Arrays.asList(cssExcludes.split(";", -1)));
 		}
-		if (cssInputDir != null) {
-			readDirectory(cssInputDir, cssInputFiles, cssInputDirs, this.cssExcludes, ".css");
-		}
+		logger = DEFAULT_LOGGER;
 	}
 
 	/**
 	 * Launches JS and CSS compression.
+	 *
+	 * @throws YuiCompressorException
+	 *           If an error occurred while compressing or merging.
 	 */
-	public void compressAll() {
+	public void compressAll() throws YuiCompressorException {
 		compressJs();
 		compressCss();
 	}
 
 	/**
-	 * Launches CSS compression.
-	 */
-	public void compressCss() {
-		if (shouldBeProcessed(cssInputFiles, cssOutputFile)) {
-			List<File> compressedFiles = new ArrayList<>();
-			for (File cssInputFile : cssInputFiles) {
-				String compressedFilePath = cssInputFile.getAbsolutePath().replaceAll("(?i)\\.css$", ".min.css");
-				File compressedFile = new File(compressedFilePath);
-				try (Reader reader = new FileReader(cssInputFile); Writer writer = new FileWriter(compressedFile)) {
-					CssCompressor compressor = new CssCompressor(reader);
-					compressor.compress(writer, LINE_BREAK);
-					compressedFiles.add(compressedFile);
-				} catch (IOException e) {
-					throw new YuiCompressorException(e);
-				}
-			}
-			merge(compressedFiles, cssOutputFile);
-			delete(cssInputFiles);
-			clean(cssInputDirs);
-		}
-	}
-
-	/**
 	 * Launches JS compression.
+	 *
+	 * @throws YuiCompressorException
+	 *           If an error occurred while compressing or merging.
 	 */
-	public void compressJs() {
+	public void compressJs() throws YuiCompressorException {
+		if (jsInputDir != null && jsInputDir.exists()) {
+			readDirectory(jsInputDir, jsInputFiles, jsInputDirs, jsExcludes, ".js");
+		}
 		if (shouldBeProcessed(jsInputFiles, jsOutputFile)) {
 			List<File> compressedFiles = new ArrayList<>();
 			for (File jsInputFile : jsInputFiles) {
@@ -183,8 +176,9 @@ public class YuiCompressor {
 					compressor.compress(writer, LINE_BREAK, true, true, true, false);
 					compressedFiles.add(compressedFile);
 				} catch (IOException e) {
-					throw new YuiCompressorException(e);
+					throw new YuiCompressorException("An error occurred while compressing " + jsInputFile, e);
 				}
+				logger.info("Compressed: " + compressedFile);
 			}
 			merge(compressedFiles, jsOutputFile);
 			delete(jsInputFiles);
@@ -193,12 +187,42 @@ public class YuiCompressor {
 	}
 
 	/**
+	 * Launches CSS compression.
+	 *
+	 * @throws YuiCompressorException
+	 *           If an error occurred while compressing or merging.
+	 */
+	public void compressCss() throws YuiCompressorException {
+		if (cssInputDir != null && cssInputDir.exists()) {
+			readDirectory(cssInputDir, cssInputFiles, cssInputDirs, cssExcludes, ".css");
+		}
+		if (shouldBeProcessed(cssInputFiles, cssOutputFile)) {
+			List<File> compressedFiles = new ArrayList<>();
+			for (File cssInputFile : cssInputFiles) {
+				String compressedFilePath = cssInputFile.getAbsolutePath().replaceAll("(?i)\\.css$", ".min.css");
+				File compressedFile = new File(compressedFilePath);
+				try (Reader reader = new FileReader(cssInputFile); Writer writer = new FileWriter(compressedFile)) {
+					CssCompressor compressor = new CssCompressor(reader);
+					compressor.compress(writer, LINE_BREAK);
+					compressedFiles.add(compressedFile);
+				} catch (IOException e) {
+					throw new YuiCompressorException("An error occurred while compressing " + cssInputFile, e);
+				}
+				logger.info("Compressed: " + compressedFile);
+			}
+			merge(compressedFiles, cssOutputFile);
+			delete(cssInputFiles);
+			clean(cssInputDirs);
+		}
+	}
+
+	/**
 	 * Recursively scans a directory:
 	 * <ul>
 	 * <li>Does not take into account the files whose names are contained in the excludes list.</li>
 	 * <li>Deletes the files whose names match "*.min{suffix}".</li>
-	 * <li>Stores the scanned files whose names match "*{suffix}".</li>
-	 * <li>Stores any scanned directory.</li>
+	 * <li>Stores the scanned files whose names match "*{suffix}" into the files list.</li>
+	 * <li>Stores any scanned directory into the filesDirs list.</li>
 	 * </ul>
 	 *
 	 * @param dir
@@ -211,8 +235,10 @@ public class YuiCompressor {
 	 *          The files whose names are contained in this list won't be taken into account.
 	 * @param suffix
 	 *          The suffix of the files to process.
+	 * @throws YuiCompressorException
+	 *           If an error occurred while deleting a previously minified file.
 	 */
-	private static void readDirectory(File dir, List<File> files, List<File> filesDirs, List<String> excludes, String suffix) {
+	private void readDirectory(File dir, List<File> files, List<File> filesDirs, List<String> excludes, String suffix) throws YuiCompressorException {
 		filesDirs.add(dir);
 		for (File file : dir.listFiles()) {
 			if (excludes.contains(file.getName())) {
@@ -222,7 +248,7 @@ public class YuiCompressor {
 				readDirectory(file, files, filesDirs, excludes, suffix);
 			} else if (file.getName().endsWith(".min" + suffix)) {
 				if (!file.delete()) {
-					throw new YuiCompressorException("Unable to delete file " + file.getAbsolutePath());
+					throw new YuiCompressorException("Unable to delete file " + file);
 				}
 			} else if (file.getName().matches(".*(?i)" + Pattern.quote(suffix))) {
 				files.add(file);
@@ -239,7 +265,7 @@ public class YuiCompressor {
 	 *          The output file.
 	 * @return false if the output file is more recent than all the input files, true otherwise.
 	 */
-	private static boolean shouldBeProcessed(List<File> inputFiles, File outputFile) {
+	private boolean shouldBeProcessed(List<File> inputFiles, File outputFile) {
 		return !inputFiles.isEmpty() && (outputFile == null || !outputFile.exists() || outputFile.lastModified() < findLatestLastModified(inputFiles));
 	}
 
@@ -250,7 +276,7 @@ public class YuiCompressor {
 	 *          The files, cannot be empty ({@link IndexOutOfBoundsException} otherwise).
 	 * @return The lasted last modified date.
 	 */
-	private static long findLatestLastModified(List<File> files) {
+	private long findLatestLastModified(List<File> files) {
 		long latestLastModified = files.get(0).lastModified();
 		for (int i = 1, n = files.size(); i < n; i++) {
 			long lastModified = files.get(i).lastModified();
@@ -274,11 +300,13 @@ public class YuiCompressor {
 	 *          The input files to merge into the output file.
 	 * @param outputFile
 	 *          The output file.
+	 * @throws YuiCompressorException
+	 *           If an error occurred while merging compressed files.
 	 */
-	private static void merge(List<File> inputFiles, File outputFile) {
+	private void merge(List<File> inputFiles, File outputFile) throws YuiCompressorException {
 		if (outputFile != null) {
 			if (outputFile.exists() && !outputFile.delete()) {
-				throw new YuiCompressorException("Unable to delete file " + outputFile.getAbsolutePath());
+				throw new YuiCompressorException("Unable to delete file " + outputFile);
 			}
 			try (OutputStream outputStream = new FileOutputStream(outputFile, true)) {
 				Collections.sort(inputFiles, new Comparator<File>() {
@@ -294,8 +322,9 @@ public class YuiCompressor {
 						ByteStreams.copy(inputStream, outputStream);
 					}
 				}
+				logger.info("Merged: " + outputFile);
 			} catch (IOException e) {
-				throw new YuiCompressorException(e);
+				throw new YuiCompressorException("An error occurred while merging files", e);
 			}
 			delete(inputFiles);
 		}
@@ -306,11 +335,13 @@ public class YuiCompressor {
 	 *
 	 * @param files
 	 *          The files to delete.
+	 * @throws YuiCompressorException
+	 *           If an error occurred while deleting a file.
 	 */
-	private static void delete(List<File> files) {
+	private void delete(List<File> files) throws YuiCompressorException {
 		for (File file : files) {
 			if (!file.delete()) {
-				throw new YuiCompressorException("Unable to delete file " + file.getAbsolutePath());
+				throw new YuiCompressorException("Unable to delete file " + file);
 			}
 		}
 	}
@@ -324,8 +355,10 @@ public class YuiCompressor {
 	 *
 	 * @param dirs
 	 *          The directories to delete.
+	 * @throws YuiCompressorException
+	 *           If an error occurred while deleting a directory.
 	 */
-	private static void clean(List<File> dirs) {
+	private void clean(List<File> dirs) throws YuiCompressorException {
 		if (!dirs.isEmpty()) {
 			Collections.sort(dirs, new Comparator<File>() {
 
@@ -337,10 +370,20 @@ public class YuiCompressor {
 			});
 			for (File dir : dirs) {
 				if (dir.list().length == 0 && !dir.delete()) {
-					throw new YuiCompressorException("Unable to delete dir " + dir.getAbsolutePath());
+					throw new YuiCompressorException("Unable to delete dir " + dir);
 				}
 			}
 		}
+	}
+
+	/**
+	 * Sets the logger to use.
+	 *
+	 * @param logger
+	 *          The logger to use.
+	 */
+	public void setLogger(Logger logger) {
+		this.logger = logger;
 	}
 
 }
