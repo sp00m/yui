@@ -132,7 +132,7 @@ public class YuiCompressor {
 		jsInputDirs = new ArrayList<>();
 		this.jsExcludes = new ArrayList<>();
 		if (!Strings.isNullOrEmpty(jsExcludes)) {
-			this.jsExcludes.addAll(Arrays.asList(jsExcludes.split(";", -1)));
+			this.jsExcludes.addAll(Arrays.asList(jsExcludes.trim().split("\\s*;\\s*", -1)));
 		}
 		this.cssInputDir = cssInputDir;
 		this.cssOutputFile = cssOutputFile;
@@ -140,7 +140,7 @@ public class YuiCompressor {
 		cssInputDirs = new ArrayList<>();
 		this.cssExcludes = new ArrayList<>();
 		if (!Strings.isNullOrEmpty(cssExcludes)) {
-			this.cssExcludes.addAll(Arrays.asList(cssExcludes.split(";", -1)));
+			this.cssExcludes.addAll(Arrays.asList(cssExcludes.trim().split("\\s*;\\s*", -1)));
 		}
 		logger = DEFAULT_LOGGER;
 	}
