@@ -11,7 +11,7 @@ Build a JAR from these sources.
 Create a target:
 
 	<target name="yui-compress">
-		<taskdef name="yuiCompress" classname="com.boogiedev.yui.YuiCompressorTask" classpath="boogiedev-yui-1.1.jar" />
+		<taskdef name="yuiCompress" classname="com.boogiedev.yui.YuiCompressorTask" classpath="boogiedev-yui-1.2.jar" />
 		<yuiCompress
 			jsInputDir="${js.inputDir}" jsOutputFile="${js.outputFile}" jsExcludes="${js.excludes}"
 			cssInputDir="${css.inputDir}" cssOutputFile="${css.outputFile}" cssExcludes="${css.excludes}" />

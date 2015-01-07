@@ -10,7 +10,7 @@
 	
 	<groupId>com.boogiedev</groupId>
 	<artifactId>boogiedev-yui</artifactId>
-	<version>1.1</version>
+	<version>1.2</version>
 	<packaging>jar</packaging>
 	<name>yui</name>
 	<description>CSS and JS Compression via the YUI Compressor</description>

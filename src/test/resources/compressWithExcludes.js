@@ -1,1 +1,1 @@
-var first=function(a){console.log(a);};var second=function(a){console.log(a);};var third=function(a){console.log(a);};var fourth=function(a){console.log(a);};
+var first=function(a){console.log(a);};var second=function(a){console.log(a);};var third=function(a){console.log(a);};var fourth=function(a){"use strict";console.log(a);};
